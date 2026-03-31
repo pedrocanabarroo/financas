@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Financeiro</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f7f8fa;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 1.1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .topbar h1 { font-size: 17px; font-weight: 600; color: #111; }
+    .topbar p  { font-size: 12px; color: #888; margin-top: 2px; }
+
+    /* ── LAYOUT ── */
+    .app { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .month-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+    .month-bar label { font-size: 13px; color: #666; }
+
+    select, input[type="text"], input[type="number"], input[type="date"] {
+      background: #fff;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 0 12px;
+      height: 38px;
+      font-size: 13px;
+      color: #111;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    select:focus, input:focus { border-color: #3b82f6; }
+
+    /* ── RECEITA BAR ── */
+    .receita-bar {
+      background: #fff;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .receita-bar label { font-size: 13px; color: #555; font-weight: 500; white-space: nowrap; }
+    .receita-hint { font-size: 12px; color: #bbb; }
+
+    /* ── SALDO BANNER ── */
+    .saldo-banner {
+      border-radius: 14px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 2px solid transparent;
+      transition: background 0.4s, border-color 0.4s;
+    }
+    .saldo-banner.neutro   { background: #f1f5f9; border-color: #cbd5e1; }
+    .saldo-banner.positivo { background: #f0fdf4; border-color: #86efac; }
+    .saldo-banner.negativo { background: #fff1f2; border-color: #fca5a5; }
+
+    .saldo-label {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.07em;
+      text-transform: uppercase; margin-bottom: 4px; transition: color 0.3s;
+    }
+    .saldo-banner.neutro   .saldo-label { color: #64748b; }
+    .saldo-banner.positivo .saldo-label { color: #16a34a; }
+    .saldo-banner.negativo .saldo-label { color: #dc2626; }
+
+    .saldo-value {
+      font-size: 38px; font-weight: 700; letter-spacing: -1.5px; transition: color 0.3s;
+    }
+    .saldo-banner.neutro   .saldo-value { color: #334155; }
+    .saldo-banner.positivo .saldo-value { color: #16a34a; }
+    .saldo-banner.negativo .saldo-value { color: #dc2626; }
+
+    .saldo-sub { font-size: 12px; margin-top: 5px; transition: color 0.3s; }
+    .saldo-banner.neutro   .saldo-sub { color: #94a3b8; }
+    .saldo-banner.positivo .saldo-sub { color: #4ade80; }
+    .saldo-banner.negativo .saldo-sub { color: #f87171; }
+
+    .saldo-icon { font-size: 52px; opacity: 0.2; user-select: none; }
+
+    /* ── METRIC CARDS ── */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+    .metric {
+      background: #fff;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+    }
+    .metric-label { font-size: 11px; color: #bbb; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    .metric-value { font-size: 20px; font-weight: 700; color: #111; }
+    .metric-value.red  { color: #dc2626; }
+    .metric-value.blue { color: #2563eb; }
+
+    /* ── CARD ── */
+    .card {
+      background: #fff;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 14px;
+      padding: 1.4rem;
+      margin-bottom: 1.1rem;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 700; color: #bbb;
+      margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.07em;
+    }
+
+    /* ── FORM ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 130px 165px auto;
+      gap: 8px;
+      align-items: end;
+    }
+    @media (max-width: 720px) {
+      .form-row { grid-template-columns: 1fr 1fr; }
+      .btn-add  { grid-column: 1 / -1; }
+    }
+    .form-group label { font-size: 12px; color: #777; display: block; margin-bottom: 4px; font-weight: 500; }
+    .form-group input, .form-group select { width: 100%; }
+
+    .btn-add {
+      background: #2563eb; color: #fff; border: none;
+      border-radius: 8px; height: 38px; padding: 0 20px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: inherit; white-space: nowrap;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-add:hover  { background: #1d4ed8; }
+    .btn-add:active { transform: scale(0.97); }
+
+    /* ── CHARTS ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; margin-bottom: 1.1rem; }
+    @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+    .chart-container { position: relative; width: 100%; height: 220px; }
+
+    .pay-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; font-size: 12px; color: #666; }
+    .pay-legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+
+    /* ── TOP DIAS ── */
+    .top-dia-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; font-size: 13px;
+    }
+    .top-dia-date { width: 70px; color: #555; font-weight: 500; flex-shrink: 0; }
+    .top-dia-bar-wrap { flex: 1; background: #f0f0f0; border-radius: 20px; height: 8px; overflow: hidden; }
+    .top-dia-bar { height: 100%; border-radius: 20px; transition: width 0.4s; }
+    .top-dia-val { width: 95px; text-align: right; font-weight: 700; flex-shrink: 0; }
+
+    /* ── TABLE ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; font-size: 11px; font-weight: 700; color: #bbb;
+      padding: 6px 10px; border-bottom: 1.5px solid #f0f0f0;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    td { padding: 10px; border-bottom: 1px solid #f5f5f5; color: #222; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #fafafa; }
+
+    /* ── BADGES ── */
+    .badge { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+    .badge-cartao   { background: #eff6ff; color: #1d4ed8; }
+    .badge-pix      { background: #f0fdf4; color: #15803d; }
+    .badge-dinheiro { background: #fffbeb; color: #b45309; }
+    .badge-debito   { background: #faf5ff; color: #7c3aed; }
+    .badge-outros   { background: #f8f8f8; color: #555; }
+
+    .btn-del {
+      background: none; border: none; cursor: pointer; color: #ccc;
+      font-size: 13px; padding: 4px 7px; border-radius: 6px;
+      transition: background 0.1s, color 0.1s; font-family: inherit;
+    }
+    .btn-del:hover { background: #fff1f2; color: #dc2626; }
+
+    .empty { color: #bbb; font-size: 13px; text-align: center; padding: 2.5rem; }
+
+    .csv-btn {
+      background: #fff; border: 1.5px solid #e0e0e0; border-radius: 8px;
+      padding: 10px 18px; font-size: 13px; font-weight: 500; cursor: pointer;
+      color: #333; width: 100%; margin-top: 1rem; font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .csv-btn:hover { background: #f7f8fa; border-color: #ccc; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #111; color: #fff; font-size: 13px;
+      padding: 10px 22px; border-radius: 30px; opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none; z-index: 100; font-weight: 500;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>💰 Painel Financeiro</h1>
+    <p>Controle de gastos mensais • exportação para Excel</p>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- MÊS -->
+  <div class="month-bar">
+    <label>Mês:</label>
+    <select id="monthFilter" onchange="renderAll()"></select>
+  </div>
+
+  <!-- RECEITA -->
+  <div class="receita-bar">
+    <label>Receita do mês (R$):</label>
+    <input type="number" id="inp-receita" placeholder="Ex: 3000,00" step="0.01" min="0"
+      oninput="renderAll()" style="width:180px" />
+    <span class="receita-hint">Informe sua renda para calcular o saldo disponível</span>
+  </div>
+
+  <!-- BANNER SALDO DINÂMICO -->
+  <div class="saldo-banner neutro" id="saldo-banner">
+    <div>
+      <div class="saldo-label" id="saldo-label">Saldo disponível</div>
+      <div class="saldo-value" id="saldo-value">R$ —</div>
+      <div class="saldo-sub"  id="saldo-sub">Informe sua receita acima</div>
+    </div>
+    <div class="saldo-icon" id="saldo-icon">💳</div>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-label">Total gasto</div><div class="metric-value red"  id="m-total">R$ 0,00</div></div>
+    <div class="metric"><div class="metric-label">Transações</div><div class="metric-value"       id="m-count">0</div></div>
+    <div class="metric"><div class="metric-label">Maior gasto</div><div class="metric-value blue" id="m-max">R$ 0,00</div></div>
+    <div class="metric"><div class="metric-label">Gasto médio</div><div class="metric-value"      id="m-avg">R$ 0,00</div></div>
+  </div>
+
+  <!-- FORM -->
+  <div class="card">
+    <div class="card-title">Adicionar gasto</div>
+    <div class="form-row">
+      <div class="form-group"><label>Data</label><input type="date" id="inp-date" /></div>
+      <div class="form-group"><label>Descrição</label><input type="text" id="inp-desc" placeholder="Ex: Supermercado" /></div>
+      <div class="form-group"><label>Valor (R$)</label><input type="number" id="inp-val" placeholder="0,00" step="0.01" min="0" /></div>
+      <div class="form-group">
+        <label>Pagamento</label>
+        <select id="inp-pay">
+          <option value="Cartão de crédito">Cartão de crédito</option>
+          <option value="Pix">Pix</option>
+          <option value="Dinheiro">Dinheiro</option>
+          <option value="Débito">Débito</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+      <button class="btn-add" onclick="addExpense()">+ Adicionar</button>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Gastos por dia</div>
+      <div class="chart-container"><canvas id="chartDays"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Forma de pagamento</div>
+      <div class="chart-container"><canvas id="chartPay"></canvas></div>
+      <div class="pay-legend" id="pay-legend"></div>
+    </div>
+  </div>
+
+  <!-- TOP DIAS -->
+  <div class="card">
+    <div class="card-title">Dias com mais gastos</div>
+    <div id="top-dias"><div class="empty">Sem dados ainda.</div></div>
+  </div>
+
+  <!-- TABELA -->
+  <div class="card">
+    <div class="card-title">Lançamentos do mês</div>
+    <div id="table-wrap"><div class="empty">Nenhum gasto cadastrado ainda.</div></div>
+    <button class="csv-btn" onclick="exportCSV()">⬇ Exportar planilha .CSV para Excel</button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let expenses = [];
+  let chartDays = null, chartPay = null;
+
+  const PAY_COLORS = {
+    'Cartão de crédito': '#3b82f6',
+    'Pix':               '#22c55e',
+    'Dinheiro':          '#f59e0b',
+    'Débito':            '#a855f7',
+    'Outros':            '#94a3b8'
+  };
+
+  const BADGE_CLASS = {
+    'Cartão de crédito': 'badge-cartao',
+    'Pix':               'badge-pix',
+    'Dinheiro':          'badge-dinheiro',
+    'Débito':            'badge-debito',
+    'Outros':            'badge-outros'
+  };
+
+  function fmt(v) {
+    return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function fmtMonth(ym) {
+    const [y, m] = ym.split('-');
+    const names = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return names[parseInt(m) - 1] + '/' + y;
+  }
+
+  function getMonths() {
+    return [...new Set(expenses.map(e => e.date.substring(0, 7)))].sort().reverse();
+  }
+
+  function populateMonthFilter() {
+    const sel = document.getElementById('monthFilter');
+    const cur = sel.value;
+    const months = getMonths();
+    sel.innerHTML = '';
+    if (!months.length) {
+      const ym = new Date().toISOString().substring(0, 7);
+      sel.innerHTML = `<option value="${ym}">${fmtMonth(ym)}</option>`;
+      return;
+    }
+    months.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = fmtMonth(m);
+      if (m === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function filteredExpenses() {
+    const sel = document.getElementById('monthFilter').value;
+    return expenses.filter(e => e.date.substring(0, 7) === sel);
+  }
+
+  function addExpense() {
+    const date = document.getElementById('inp-date').value;
+    const desc = document.getElementById('inp-desc').value.trim();
+    const val  = parseFloat(document.getElementById('inp-val').value);
+    const pay  = document.getElementById('inp-pay').value;
+
+    if (!date || !desc || isNaN(val) || val <= 0) {
+      showToast('⚠️ Preencha todos os campos corretamente.');
+      return;
+    }
+
+    expenses.push({ id: Date.now(), date, desc, val, pay });
+    expenses.sort((a, b) => b.date.localeCompare(a.date));
+    document.getElementById('inp-desc').value = '';
+    document.getElementById('inp-val').value  = '';
+    populateMonthFilter();
+    document.getElementById('monthFilter').value = date.substring(0, 7);
+    renderAll();
+    showToast('✅ Gasto adicionado!');
+  }
+
+  function deleteExpense(id) {
+    expenses = expenses.filter(e => e.id !== id);
+    populateMonthFilter();
+    renderAll();
+    showToast('🗑️ Gasto removido.');
+  }
+
+  function renderSaldo(total) {
+    const receita = parseFloat(document.getElementById('inp-receita').value) || 0;
+    const banner  = document.getElementById('saldo-banner');
+    const lbl     = document.getElementById('saldo-label');
+    const val     = document.getElementById('saldo-value');
+    const sub     = document.getElementById('saldo-sub');
+    const icon    = document.getElementById('saldo-icon');
+
+    banner.classList.remove('neutro', 'positivo', 'negativo');
+
+    if (!receita) {
+      banner.classList.add('neutro');
+      val.textContent  = 'R$ —';
+      lbl.textContent  = 'Saldo disponível';
+      sub.textContent  = 'Informe sua receita acima para ver o saldo';
+      icon.textContent = '💳';
+      return;
+    }
+
+    const saldo = receita - total;
+
+    if (saldo >= 0) {
+      banner.classList.add('positivo');
+      lbl.textContent  = '✅ Saldo positivo';
+      icon.textContent = '📈';
+      sub.textContent  = `Receita: ${fmt(receita)}  •  Gastos: ${fmt(total)}`;
+    } else {
+      banner.classList.add('negativo');
+      lbl.textContent  = '⚠️ Saldo negativo — gastos acima da receita';
+      icon.textContent = '📉';
+      sub.textContent  = `Receita: ${fmt(receita)}  •  Gastos: ${fmt(total)}  •  Excedeu: ${fmt(Math.abs(saldo))}`;
+    }
+
+    val.textContent = fmt(saldo);
+  }
+
+  function renderMetrics(data) {
+    const total = data.reduce((s, e) => s + e.val, 0);
+    const max   = data.length ? Math.max(...data.map(e => e.val)) : 0;
+    const avg   = data.length ? total / data.length : 0;
+    document.getElementById('m-total').textContent = fmt(total);
+    document.getElementById('m-count').textContent = data.length;
+    document.getElementById('m-max').textContent   = fmt(max);
+    document.getElementById('m-avg').textContent   = fmt(avg);
+    return total;
+  }
+
+  function renderTable(data) {
+    const wrap = document.getElementById('table-wrap');
+    if (!data.length) { wrap.innerHTML = '<div class="empty">Nenhum gasto neste mês.</div>'; return; }
+    let html = `<table><thead><tr>
+      <th>Data</th><th>Descrição</th><th>Pagamento</th>
+      <th style="text-align:right">Valor</th><th></th>
+    </tr></thead><tbody>`;
+    data.forEach(e => {
+      const [y, mo, d] = e.date.split('-');
+      html += `<tr>
+        <td style="color:#999">${d}/${mo}/${y}</td>
+        <td style="font-weight:500">${e.desc}</td>
+        <td><span class="badge ${BADGE_CLASS[e.pay] || 'badge-outros'}">${e.pay}</span></td>
+        <td style="text-align:right;font-weight:700;color:#dc2626">${fmt(e.val)}</td>
+        <td><button class="btn-del" onclick="deleteExpense(${e.id})">✕</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  function renderTopDias(data) {
+    const wrap = document.getElementById('top-dias');
+    if (!data.length) { wrap.innerHTML = '<div class="empty">Sem dados ainda.</div>'; return; }
+    const byDay = {};
+    data.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.val; });
+    const sorted = Object.entries(byDay).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const maxVal = sorted[0][1];
+    let html = '';
+    sorted.forEach(([dt, v], i) => {
+      const [y, mo, d] = dt.split('-');
+      const pct   = Math.round(v / maxVal * 100);
+      const color = i === 0 ? '#dc2626' : (i === 1 ? '#f97316' : '#3b82f6');
+      html += `<div class="top-dia-row">
+        <div class="top-dia-date">${d}/${mo}/${y}</div>
+        <div class="top-dia-bar-wrap">
+          <div class="top-dia-bar" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <div class="top-dia-val" style="color:${i === 0 ? '#dc2626' : '#111'}">${fmt(v)}</div>
+      </div>`;
+    });
+    wrap.innerHTML = html;
+  }
+
+  function renderChartDays(data) {
+    const byDay = {};
+    data.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.val; });
+    const sorted = Object.keys(byDay).sort();
+    const labels = sorted.map(d => { const p = d.split('-'); return p[2] + '/' + p[1]; });
+    const vals   = sorted.map(d => parseFloat(byDay[d].toFixed(2)));
+    const maxVal = vals.length ? Math.max(...vals) : 0;
+    const colors = vals.map(v => v === maxVal && v > 0 ? '#dc2626' : '#3b82f6');
+
+    if (chartDays) chartDays.destroy();
+    chartDays = new Chart(document.getElementById('chartDays').getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 5 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.y) } } },
+        scales: {
+          x: { ticks: { font: { size: 11 }, color: '#bbb', autoSkip: true, maxRotation: 45 }, grid: { display: false } },
+          y: { ticks: { font: { size: 11 }, color: '#bbb', callback: v => 'R$' + Math.round(v) }, grid: { color: '#f5f5f5' } }
+        }
+      }
+    });
+  }
+
+  function renderChartPay(data) {
+    const byPay = {};
+    data.forEach(e => { byPay[e.pay] = (byPay[e.pay] || 0) + e.val; });
+    const labels = Object.keys(byPay);
+    const vals   = labels.map(k => parseFloat(byPay[k].toFixed(2)));
+    const colors = labels.map(k => PAY_COLORS[k] || '#94a3b8');
+    const total  = vals.reduce((s, v) => s + v, 0);
+
+    if (chartPay) chartPay.destroy();
+    chartPay = new Chart(document.getElementById('chartPay').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => c.label + ': ' + fmt(c.parsed) + ' (' + Math.round(c.parsed / total * 100) + '%)' } }
+        }
+      }
+    });
+
+    document.getElementById('pay-legend').innerHTML = labels.map((l, i) =>
+      `<span><span class="legend-dot" style="background:${colors[i]}"></span>${l} — ${Math.round(vals[i] / total * 100)}%</span>`
+    ).join('');
+  }
+
+  function renderAll() {
+    const data  = filteredExpenses();
+    const total = renderMetrics(data);
+    renderSaldo(total);
+    renderTable(data);
+    renderTopDias(data);
+    renderChartDays(data);
+    renderChartPay(data);
+  }
+
+  function exportCSV() {
+    const data = filteredExpenses();
+    if (!data.length) { showToast('Nenhum dado para exportar neste mês.'); return; }
+
+    const sel     = document.getElementById('monthFilter').value;
+    const receita = parseFloat(document.getElementById('inp-receita').value) || 0;
+    const total   = data.reduce((s, e) => s + e.val, 0);
+    const saldo   = receita - total;
+
+    const byDay = {};
+    data.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.val; });
+    const byPay = {};
+    data.forEach(e => { byPay[e.pay] = (byPay[e.pay] || 0) + e.val; });
+
+    let csv = '\uFEFF';
+    csv += 'PAINEL FINANCEIRO - ' + fmtMonth(sel) + '\r\n\r\n';
+    csv += 'RESUMO DO MÊS\r\n';
+    if (receita > 0) {
+      csv += 'Receita do Mês;' + receita.toFixed(2).replace('.', ',') + '\r\n';
+      csv += 'Saldo (' + (saldo >= 0 ? 'POSITIVO' : 'NEGATIVO') + ');' + saldo.toFixed(2).replace('.', ',') + '\r\n';
+    }
+    csv += 'Total Gasto;' + total.toFixed(2).replace('.', ',') + '\r\n';
+    csv += 'Número de Transações;' + data.length + '\r\n';
+    csv += 'Gasto Médio;' + (total / data.length).toFixed(2).replace('.', ',') + '\r\n';
+    csv += 'Maior Gasto;' + Math.max(...data.map(e => e.val)).toFixed(2).replace('.', ',') + '\r\n';
+    csv += '\r\n';
+
+    csv += 'DIAS COM MAIS GASTOS\r\n';
+    csv += 'Data;Total do Dia (R$)\r\n';
+    Object.entries(byDay).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([dt, v]) => {
+      const [y, mo, d] = dt.split('-');
+      csv += d + '/' + mo + '/' + y + ';' + v.toFixed(2).replace('.', ',') + '\r\n';
+    });
+    csv += '\r\n';
+
+    csv += 'GASTOS POR FORMA DE PAGAMENTO\r\n';
+    csv += 'Forma de Pagamento;Total (R$);Porcentagem\r\n';
+    Object.entries(byPay).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+      csv += k + ';' + v.toFixed(2).replace('.', ',') + ';' + Math.round(v / total * 100) + '%\r\n';
+    });
+    csv += '\r\n';
+
+    csv += 'GASTOS POR DIA\r\n';
+    csv += 'Data;Total do Dia (R$)\r\n';
+    Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0])).forEach(([dt, v]) => {
+      const [y, mo, d] = dt.split('-');
+      csv += d + '/' + mo + '/' + y + ';' + v.toFixed(2).replace('.', ',') + '\r\n';
+    });
+    csv += '\r\n';
+
+    csv += 'LANÇAMENTOS DETALHADOS\r\n';
+    csv += 'Data;Descrição;Forma de Pagamento;Valor (R$)\r\n';
+    data.forEach(e => {
+      const [y, mo, d] = e.date.split('-');
+      csv += d + '/' + mo + '/' + y + ';' + e.desc + ';' + e.pay + ';' + e.val.toFixed(2).replace('.', ',') + '\r\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'gastos_' + sel + '.csv';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    showToast('✅ Planilha exportada!');
+  }
+
+  // Init
+  document.getElementById('inp-date').valueAsDate = new Date();
+  populateMonthFilter();
+  renderAll();
+
+  document.getElementById('inp-desc').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('inp-val').focus();
+  });
+  document.getElementById('inp-val').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addExpense();
+  });
+</script>
+</body>
+</html>
